@@ -61,6 +61,21 @@ The script chooses the matching private token in memory and prints the decision.
 
 A staging token is not accepted for production. Use this separation to demonstrate the authentication boundary rather than exposing tokens in frontend code.
 
+## OpenAPI and Postman
+
+Import the public JSON files under `docs/postman` and fill the selected environment's local secret values using `.local/LOCAL-CREDENTIALS.txt`. Keep the cookie jar enabled. The ordered collection mutates staging only, adds three publications per completed run, and performs read-only production evaluation. Follow the [REST walkthrough](REST-CLIENT-GUIDE.md) before running it.
+
+The current web image serves `/openapi.json`, `/postman.collection.json` and `/postman.environment.example.json` as static JSON. Rebuild the web image after changing those files. They use exact Nginx locations and return 404 when absent, rather than returning the React entry page.
+
+Regenerate and validate documentation after changing its source generator:
+
+```powershell
+node scripts/generate-api-docs.mjs
+node scripts/check-api-docs.mjs
+```
+
+The checker uses the frontend's pinned OpenAPI parser dependency, so install frontend dependencies through the normal verification workflow first. It checks the contract and collection statically; it does not start servers, read private configuration or execute mutation requests.
+
 ## Verification
 
 ```powershell

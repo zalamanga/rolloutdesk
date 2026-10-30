@@ -1,0 +1,720 @@
+{
+  "info": {
+    "name": "RolloutDesk REST workflow",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run in order against a disposable local staging lab. This collection changes one flag, adds three immutable publications per complete run, and preserves the second draft on rollback. It stops Collection Runner after an unexpected response and never retries a version conflict. Read docs/REST-CLIENT-GUIDE.md. All password/token environment defaults are blank."
+  },
+  "variable": [
+    {
+      "key": "flagKey",
+      "value": "checkout-redesign",
+      "type": "string"
+    },
+    {
+      "key": "environment",
+      "value": "staging",
+      "type": "string"
+    },
+    {
+      "key": "subjectId",
+      "value": "demo-alice",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expectedVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "targetRevision",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "firstConfig",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "secondConfig",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/health",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Login and retain cookie",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{operatorEmail}}\",\n  \"password\": \"{{operatorPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.environment.get('baseUrl') !== 'http://127.0.0.1:8098') { throw new Error('Use the exact local RolloutDesk origin.'); }",
+              "for (const key of ['operatorPassword', 'stagingToken', 'productionToken']) { if (!pm.environment.get(key)) { throw new Error('Fill the private ' + key + ' in the selected local environment first.'); } }",
+              "if (pm.collectionVariables.get('environment') !== 'staging') { throw new Error('This mutation walkthrough is restricted to staging.'); }"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('csrfToken', data.csrfToken);",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Read session",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/auth/session",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  pm.test('CSRF matches login', () => pm.expect(pm.response.json().csrfToken).to.eql(pm.collectionVariables.get('csrfToken')));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 List flags",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  pm.test('Three registered flags', () => pm.expect(pm.response.json()).to.have.length(3));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Read detail and choose distinct configurations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "  const activeEnabled = data.state.active ? data.state.active.config.enabled : false;",
+              "  pm.collectionVariables.set('firstConfig', JSON.stringify({enabled: !activeEnabled, rolloutBasisPoints: 2500, allowlist: ['demo-alice']}));",
+              "  pm.collectionVariables.set('secondConfig', JSON.stringify({enabled: activeEnabled, rolloutBasisPoints: 7500, allowlist: []}));",
+              "  pm.test('Room for three new publications', () => pm.expect(data.history.length).to.be.at.most(97));",
+              "  if (data.history.length > 97) { pm.execution.setNextRequest(null); }",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Save first draft",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/draft",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\": {{expectedVersion}}, \"config\": {{firstConfig}}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "  pm.test('Saved draft matches intended config', () => pm.expect(data.draft).to.deep.equal(JSON.parse(pm.collectionVariables.get('firstConfig'))));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Publish first saved draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/publish",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\": {{expectedVersion}}, \"note\":\"Publish first REST walkthrough configuration\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "  pm.collectionVariables.set('targetRevision', String(data.state.active.revision));",
+              "  pm.test('First publication uses saved config', () => pm.expect(data.state.active.config).to.deep.equal(JSON.parse(pm.collectionVariables.get('firstConfig'))));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Save second draft",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/draft",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\": {{expectedVersion}}, \"config\": {{secondConfig}}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "  pm.test('Saved draft matches intended config', () => pm.expect(data.draft).to.deep.equal(JSON.parse(pm.collectionVariables.get('secondConfig'))));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Publish second saved draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/publish",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\": {{expectedVersion}}, \"note\":\"Publish second REST walkthrough configuration\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Roll back while retaining second draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/rollback",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\": {{expectedVersion}}, \"targetRevision\": {{targetRevision}}, \"note\":\"Restore the first REST walkthrough publication\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('expectedVersion', String(data.state ? data.state.version : data.version));",
+              "  pm.test('Rollback references selected revision', () => pm.expect(data.state.active.sourceRevision).to.eql(Number(pm.collectionVariables.get('targetRevision'))));",
+              "  pm.test('Rollback restores first configuration', () => pm.expect(data.state.active.config).to.deep.equal(JSON.parse(pm.collectionVariables.get('firstConfig'))));",
+              "  pm.test('Second draft survives rollback', () => pm.expect(data.state.draft).to.deep.equal(JSON.parse(pm.collectionVariables.get('secondConfig'))));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Preview draft versus published",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/flags/{{flagKey}}/{{environment}}/preview",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"subjectId\": \"{{subjectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  const data = pm.response.json();",
+              "  pm.test('Draft has no published revision', () => pm.expect(data.draft.revision).to.eql(null));",
+              "  pm.test('Both decisions use the same cohort bucket', () => pm.expect(data.draft.bucket).to.eql(data.published.bucket));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Read audit",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/audit?page=0",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  pm.test('Fixed audit page size', () => pm.expect(pm.response.json().pageSize).to.eql(25));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Evaluate staging with staging token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{stagingToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/client/v1/evaluate/staging",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"flagKey\": \"{{flagKey}}\",\n  \"subjectId\": \"{{subjectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Evaluate production with production token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{productionToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/client/v1/evaluate/production",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"flagKey\": \"{{flagKey}}\",\n  \"subjectId\": \"{{subjectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Production is read only in this walkthrough. UNPUBLISHED is a valid 200 response."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Reject staging token for production",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{stagingToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/client/v1/evaluate/production",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"flagKey\": \"{{flagKey}}\",\n  \"subjectId\": \"{{subjectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "if (pm.response.code === 401) {",
+              "  pm.test('Wrong environment is unauthorized', () => pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED'));",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "{{baseUrl}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{baseUrl}}/api/auth/logout",
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204', () => pm.response.to.have.status(204));",
+              "if (pm.response.code === 204) {",
+              "  pm.collectionVariables.unset('csrfToken');",
+              "  pm.collectionVariables.unset('expectedVersion');",
+              "  pm.collectionVariables.unset('targetRevision');",
+              "} else { pm.execution.setNextRequest(null); }"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

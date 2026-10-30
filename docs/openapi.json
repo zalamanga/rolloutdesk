@@ -1,0 +1,2233 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "RolloutDesk REST API",
+    "version": "1.0.0",
+    "description": "Rust/axum feature-release lab. Operator APIs use an opaque HttpOnly cookie plus CSRF and exact Origin on writes. The client API accepts an environment-scoped bearer token and reads published configuration only. Handler responses use no-store; this specification contains no real credentials. Scope: three fixed flags, two environments, one local operator. No create/delete, OAuth, exposure collection or SDK is supplied."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8098",
+      "description": "Local Nginx entry point. Start the repository Compose stack first."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health and session"
+    },
+    {
+      "name": "Operator release workflow"
+    },
+    {
+      "name": "Published client evaluation"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Check API and database health",
+        "tags": [
+          "Health and session"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Create an operator cookie session",
+        "tags": [
+          "Health and session"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated session and CSRF token. Postman stores the cookie in its cookie jar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "rolloutdesk_session=<opaque>; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200. Secure is added when configured.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "429": {
+            "description": "Sign-in limit reached: 10 attempts, including successful attempts, per five-minute window. The local Nginx proxy shares a source address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Read the current operator and CSRF token",
+        "tags": [
+          "Health and session"
+        ],
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Invalidate the current session",
+        "tags": [
+          "Health and session"
+        ],
+        "security": [
+          {
+            "cookieSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Logged out. No response body; Set-Cookie expires the session.",
+            "headers": {
+              "Set-Cookie": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Expires rolloutdesk_session with Max-Age=0."
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags": {
+      "get": {
+        "operationId": "listFlags",
+        "summary": "List the three registered flags and both states",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exactly three flags ordered by key; each contains staging then production state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Flag"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags/{key}/{environment}": {
+      "get": {
+        "operationId": "getFlagDetail",
+        "summary": "Read state, version and immutable history together",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registered keys: checkout-redesign, bulk-export and priority-support. Other keys return 404 for operator routes."
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "404": {
+            "description": "Operator flag, environment or rollback target does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags/{key}/{environment}/draft": {
+      "put": {
+        "operationId": "saveDraft",
+        "summary": "Save a draft without changing client behavior",
+        "description": "Checks the explicit expectedVersion. Canonical identical drafts may return the unchanged version and create no audit record. A changed draft increments the state version atomically with its audit entry.",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registered keys: checkout-redesign, bulk-export and priority-support. Other keys return 404 for operator routes."
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftInput"
+              },
+              "examples": {
+                "demo": {
+                  "value": {
+                    "expectedVersion": 1,
+                    "config": {
+                      "enabled": true,
+                      "rolloutBasisPoints": 2500,
+                      "allowlist": [
+                        "demo-alice"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "Operator flag, environment or rollback target does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "409": {
+            "description": "The version is stale, the configuration already equals the active publication, or the pair has 100 publications. Refresh and review; do not automatically retry with a new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VERSION_CONFLICT",
+              "NO_CHANGE",
+              "REVISION_LIMIT"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags/{key}/{environment}/publish": {
+      "post": {
+        "operationId": "publish",
+        "summary": "Publish the current saved draft atomically",
+        "description": "Creates an immutable revision from the stored draft, switches the active pointer and appends audit in one transaction. State version increases. Draft remains unchanged. At most 100 publications per flag/environment pair.",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registered keys: checkout-redesign, bulk-export and priority-support. Other keys return 404 for operator routes."
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishInput"
+              },
+              "examples": {
+                "demo": {
+                  "value": {
+                    "expectedVersion": 2,
+                    "note": "Release the staging demo cohort"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "Operator flag, environment or rollback target does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "409": {
+            "description": "The version is stale, the configuration already equals the active publication, or the pair has 100 publications. Refresh and review; do not automatically retry with a new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VERSION_CONFLICT",
+              "NO_CHANGE",
+              "REVISION_LIMIT"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags/{key}/{environment}/rollback": {
+      "post": {
+        "operationId": "rollback",
+        "summary": "Append a revision copying an earlier publication",
+        "description": "Target must exist within the same pair. Creates a new ROLLBACK revision with sourceRevision, changes active and audit atomically, and preserves the current draft. Copying the active configuration is a NO_CHANGE conflict.",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registered keys: checkout-redesign, bulk-export and priority-support. Other keys return 404 for operator routes."
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollbackInput"
+              },
+              "examples": {
+                "demo": {
+                  "value": {
+                    "expectedVersion": 5,
+                    "targetRevision": 1,
+                    "note": "Restore the reviewed staging revision"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "Operator flag, environment or rollback target does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "409": {
+            "description": "The version is stale, the configuration already equals the active publication, or the pair has 100 publications. Refresh and review; do not automatically retry with a new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VERSION_CONFLICT",
+              "NO_CHANGE",
+              "REVISION_LIMIT"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/flags/{key}/{environment}/preview": {
+      "post": {
+        "operationId": "preview",
+        "summary": "Compare saved draft and active decisions without writing data",
+        "description": "Requires CSRF and Origin even though it is read-only. The draft decision has null revision. Subject/evaluation history is not stored.",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": [],
+            "csrfToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registered keys: checkout-redesign, bulk-export and priority-support. Other keys return 404 for operator routes."
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "http://127.0.0.1:8098"
+              ]
+            },
+            "description": "Must exactly match ROLLOUT_APP_ORIGIN. Changing 127.0.0.1 to localhost is a different origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInput"
+              },
+              "examples": {
+                "demo": {
+                  "value": {
+                    "subjectId": "demo-alice"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "403": {
+            "description": "Origin is not the configured exact origin, or the CSRF token does not match the session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "Operator flag, environment or rollback target does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "operationId": "listAudit",
+        "summary": "Read stable newest-first audit history",
+        "description": "Only the optional single page query is supported. Duplicate page, additional query fields, signs and fractional/encoded forms are rejected. An absent query means page zero. Page size is fixed at 25.",
+        "tags": [
+          "Operator release workflow"
+        ],
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            },
+            "description": "A single ASCII decimal string of one through five digits, 0 to 10000. No other query parameters."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/client/v1/evaluate/{environment}": {
+      "post": {
+        "operationId": "evaluatePublishedFlag",
+        "summary": "Evaluate only published configuration with a scoped bearer token",
+        "description": "A staging token cannot evaluate production and vice versa. No operator cookie, Origin or CSRF is required. Invalid environments fail authentication with 401. Unknown syntactically valid keys and unpublished flags safely return false with HTTP 200. Subjects and decisions are not persisted.",
+        "tags": [
+          "Published client evaluation"
+        ],
+        "security": [
+          {
+            "clientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "staging",
+                "production"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Exactly one JSON object, at most 16 KiB. Integer values must not be fractional. Unknown fields are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateInput"
+              },
+              "examples": {
+                "demo": {
+                  "value": {
+                    "flagKey": "checkout-redesign",
+                    "subjectId": "demo-alice"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, unknown fields, wrong Content-Type, body over 16 KiB or invalid request values. These failures return 400 rather than 415 or 422.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REQUEST"
+            ]
+          },
+          "401": {
+            "description": "Authentication is missing, expired, malformed or invalid; a bearer token may belong to the other environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHORIZED"
+            ]
+          },
+          "405": {
+            "description": "The HTTP method is not supported for the requested route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "METHOD_NOT_ALLOWED"
+            ]
+          },
+          "500": {
+            "description": "An internal operation failed. The response does not disclose internal database details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INTERNAL_ERROR"
+            ]
+          },
+          "503": {
+            "description": "The database or pool is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "UNAUTHORIZED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "METHOD_NOT_ALLOWED",
+              "VERSION_CONFLICT",
+              "NO_CHANGE",
+              "REVISION_LIMIT",
+              "RATE_LIMITED",
+              "UNAVAILABLE",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "email",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "user",
+          "csrfToken"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "csrfToken": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "Config": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "rolloutBasisPoints",
+          "allowlist"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "rolloutBasisPoints": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "description": "Case-sensitive ASCII subject. It is not stored by evaluation or preview."
+            },
+            "maxItems": 20,
+            "uniqueItems": true,
+            "description": "Canonical responses sort these exact case-sensitive IDs. Duplicate request IDs are invalid."
+          }
+        }
+      },
+      "Publication": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "config",
+          "kind",
+          "sourceRevision",
+          "note",
+          "actor",
+          "createdAt"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "config": {
+            "$ref": "#/components/schemas/Config"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PUBLISH",
+              "ROLLBACK"
+            ]
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NullablePublication": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "config",
+          "kind",
+          "sourceRevision",
+          "note",
+          "actor",
+          "createdAt"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "config": {
+            "$ref": "#/components/schemas/Config"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PUBLISH",
+              "ROLLBACK"
+            ]
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "nullable": true,
+        "description": "A full publication object, or null before the first publication. PUBLISH has a null sourceRevision; ROLLBACK references an existing revision."
+      },
+      "EnvironmentState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "environment",
+          "version",
+          "draft",
+          "active",
+          "updatedAt"
+        ],
+        "properties": {
+          "environment": {
+            "type": "string",
+            "enum": [
+              "staging",
+              "production"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "format": "int64"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Config"
+          },
+          "active": {
+            "$ref": "#/components/schemas/NullablePublication"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FlagIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "name",
+          "description"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Flag": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "name",
+          "description",
+          "states"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentState"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Staging followed by production."
+          }
+        }
+      },
+      "FlagDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag",
+          "state",
+          "history"
+        ],
+        "properties": {
+          "flag": {
+            "$ref": "#/components/schemas/FlagIdentity"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EnvironmentState"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Publication"
+            },
+            "maxItems": 100,
+            "description": "Newest revision first."
+          }
+        }
+      },
+      "Decision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flagKey",
+          "environment",
+          "revision",
+          "value",
+          "reason",
+          "bucket",
+          "algorithm"
+        ],
+        "properties": {
+          "flagKey": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "staging",
+              "production"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "nullable": true
+          },
+          "value": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "FLAG_NOT_FOUND",
+              "UNPUBLISHED",
+              "DISABLED",
+              "ALLOWLIST",
+              "ROLLOUT",
+              "OUTSIDE_ROLLOUT"
+            ]
+          },
+          "bucket": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "nullable": true
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "sha256-u32be-mod10000-v1"
+            ]
+          }
+        },
+        "description": "Unknown valid keys return false, FLAG_NOT_FOUND and null bucket/revision. Unpublished registered keys return false, UNPUBLISHED and a numeric bucket. Draft preview always has null revision."
+      },
+      "Preview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "published",
+          "draft"
+        ],
+        "properties": {
+          "published": {
+            "$ref": "#/components/schemas/Decision"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Decision"
+          }
+        }
+      },
+      "AuditItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "actor",
+          "action",
+          "flagKey",
+          "environment",
+          "revision",
+          "note"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "DRAFT_SAVED",
+              "PUBLISHED",
+              "ROLLED_BACK"
+            ]
+          },
+          "flagKey": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "staging",
+              "production"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditItem"
+            },
+            "maxItems": 25
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "pageSize": {
+            "type": "integer",
+            "enum": [
+              25
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "format": "int64"
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "At most 254 UTF-8 bytes before normalization. Trimmed and ASCII-lowercased for lookup; no registration endpoint exists."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 72,
+            "format": "password",
+            "description": "At most 72 UTF-8 bytes. No password value is included in this specification."
+          }
+        }
+      },
+      "DraftInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "config"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "config": {
+            "$ref": "#/components/schemas/Config"
+          }
+        }
+      },
+      "PublishInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "note"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Rust trims surrounding Unicode whitespace, then requires 10 to 500 Unicode scalar values. The untrimmed JSON string can be longer than 500 characters.",
+            "x-trimmedLength": {
+              "minimum": 10,
+              "maximum": 500
+            }
+          }
+        }
+      },
+      "RollbackInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "targetRevision",
+          "note"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "targetRevision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "note": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Rust trims surrounding Unicode whitespace, then requires 10 to 500 Unicode scalar values. The untrimmed JSON string can be longer than 500 characters.",
+            "x-trimmedLength": {
+              "minimum": 10,
+              "maximum": 500
+            }
+          }
+        }
+      },
+      "PreviewInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subjectId"
+        ],
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "description": "Case-sensitive ASCII subject. It is not stored by evaluation or preview."
+          }
+        }
+      },
+      "EvaluateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flagKey",
+          "subjectId"
+        ],
+        "properties": {
+          "flagKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z0-9-]+$",
+            "description": "A valid unregistered key is accepted and returns a safe false decision."
+          },
+          "subjectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "description": "Case-sensitive ASCII subject. It is not stored by evaluation or preview."
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "cookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "rolloutdesk_session",
+        "description": "Opaque HttpOnly cookie from login, expires after 12 hours. Not a JWT. Swagger browser consoles cannot manually set this cookie; use the same-origin UI or Postman cookie jar."
+      },
+      "csrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "csrfToken from the matching successful login/session response. Combine with the session cookie and exact Origin."
+      },
+      "clientBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "64 hexadecimal characters",
+        "description": "Private token scoped to the requested staging or production environment. This is not an OAuth/JWT token. Never put it in frontend code or a URL."
+      }
+    }
+  }
+}

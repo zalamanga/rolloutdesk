@@ -4,6 +4,8 @@ Panduan ini menjelaskan urutan membangun ulang proyek serta alasan tiap bagian k
 
 RolloutDesk memisahkan draft dengan konfigurasi yang sudah dirilis. Operator mengedit melalui React. Rust memvalidasi request, menyimpan perubahan di PostgreSQL, dan menghitung keputusan flag. Docker menjalankan komponen tersebut dengan Nginx sebagai pintu masuk.
 
+Untuk mempelajari backend tanpa React, mulai dari [tutorial REST dan Postman](REST-CLIENT-GUIDE.md). `docs/openapi.json` menjelaskan 12 route Rust dalam OpenAPI 3.0.3. `scripts/generate-api-docs.mjs` menghasilkan kontrak tersebut beserta collection dan contoh environment tanpa membaca secret. `scripts/check-api-docs.mjs` memvalidasi kontrak dan mencocokkan route dengan `backend/src/api.rs`. Nginx menyajikan dokumen publik itu sebagai JSON terpisah dari halaman React.
+
 ## 1. Tetapkan perilaku sebelum membuat halaman
 
 Ada tiga flag tetap: `checkout-redesign`, `bulk-export`, dan `priority-support`. Masing-masing mempunyai `staging` dan `production`. Keadaan awal adalah draft disabled, persentase nol, allowlist kosong, version 1, dan belum ada publication.

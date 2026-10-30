@@ -4,6 +4,8 @@ Local base URL: `http://127.0.0.1:8098`. JSON field names use camelCase; timesta
 
 There are two authentication paths. `/api` is the operator interface and uses a cookie session. `/client/v1` evaluates published configuration using an environment-scoped bearer token. A client token must stay on a trusted client/server; never include it in a browser build or a URL.
 
+The machine-readable contract is [OpenAPI 3.0.3](openapi.json). The [Postman collection](postman/RolloutDesk.postman_collection.json), [blank-secret environment](postman/RolloutDesk.local.postman_environment.example.json) and [Indonesian REST walkthrough](REST-CLIENT-GUIDE.md) cover the complete release flow. Nginx serves their JSON at `/openapi.json`, `/postman.collection.json` and `/postman.environment.example.json`; these static public files contain no real credentials.
+
 ## Operator session
 
 `POST /api/auth/login`
@@ -73,6 +75,8 @@ Returns the updated environment state. Saving a draft changes no active publicat
 
 `rolloutBasisPoints` must be an integer from 0 through 10000. The allowlist contains at most 20 unique strings. Each subject is 1 through 64 ASCII bytes matching `[A-Za-z0-9._-]+`. Subject IDs are case-sensitive; duplicate entries are invalid. The server sorts the allowlist before comparison and storage.
 
+`expectedVersion` must be an integer from 1 through 1,000,000,000. Invalid JSON, unknown request fields, unsupported Content-Type and body sizes over the 16 KiB JSON limit return 400 `INVALID_REQUEST`, rather than 415 or 422.
+
 Use the version from the most recent explicit read. HTTP 409 means the state changed or the operation is no longer valid. Do not fetch a new version and automatically retry a pending write.
 
 ## Publish
@@ -96,6 +100,8 @@ Each flag/environment pair allows at most 100 publications, including rollbacks.
 ```
 
 The target must exist in the same flag/environment history. The result is a new immutable revision copying the target configuration, with `kind: "ROLLBACK"` and `sourceRevision: 1`. The draft stays as it was. Selecting a target with the same configuration as the active one is rejected.
+
+`targetRevision` must be an integer from 1 through 100. A number within that range that does not exist in the pair returns 404.
 
 Publication and rollback notes are trimmed and must contain 10 through 500 Unicode codepoints after trimming. The audit and active pointer change atomically with the publication.
 

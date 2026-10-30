@@ -70,6 +70,16 @@ For local execution, the API and test binaries were downloaded from that success
 
 Ignored `.local` data contains downloaded binaries, raw check results and local runtime build helpers. None of those files, private `.env` values or browser traces are committed. Start/Test redirect subprocess TEMP/TMP into `.local/tmp` and restore the previous values on exit. Docker's disk-image location remains a separate Docker Desktop setting.
 
+## REST documentation and client execution
+
+On 31 October 2026 local time, Swagger Parser 12.1.0 validated the generated OpenAPI 3.0.3 document. All 12 method/route pairs match the Rust router. The static checker also checked generated-file equality, nullable models, strict request schemas, blank example secrets and syntax for all 16 Postman request scripts.
+
+The updated local Nginx image served `/openapi.json`, `/postman.collection.json` and `/postman.environment.example.json`. `scripts/check-served-docs.mjs` fetched each route over HTTP and verified status 200, JSON content type and exact source equality. CI now runs both documentation checks.
+
+The exported Postman collection was executed against the actual local API and PostgreSQL using Newman 6.2.3 with an in-memory private environment: **16 requests and 29 assertions passed**. The run saved and published two staging configurations, appended a rollback, compared draft/published decisions, checked scoped bearer evaluation, received the expected wrong-scope 401 and logged out with 204. No response bodies, cookies or credentials were exported into the committed evidence. This run intentionally added three synthetic staging publications; it did not change production.
+
+The later complete [run 41096338006](https://github.com/zalamanga/rolloutdesk/actions/runs/41096338006) also passed for source `3ea335706349b659957673df89b9470f7974e9d3`, including the strengthened screenshot/navigation checks. The REST documentation and static-route changes described here follow that source; their additional local checks are recorded separately above.
+
 ## Limits
 
 This is a single-operator local lab with three fixed flags. It has no streaming SDK, exposure analytics, external clients or multi-tenant administration. Bucketing is not access authorization and does not guarantee an exact percentage in a finite audience. No production load, availability or performance SLA is claimed. See the [API](API.md), [operations](OPERATIONS.md) and [UI review](UX-REVIEW.md) for the exact boundaries and evidence.

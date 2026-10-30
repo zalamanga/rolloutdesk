@@ -72,6 +72,12 @@ Publication locks a flag/environment row, checks `expectedVersion`, appends a re
 
 The evaluator hashes the flag key, environment and subject using a documented length-prefixed SHA-256 input. Revision and percentage are excluded from the hash. Increasing the percentage therefore retains the existing cohort. A percentage is a threshold over buckets, not a promise of an exact split in a small audience.
 
+## Explore the REST API
+
+The Rust service exposes 12 method/route pairs. Import [OpenAPI 3.0.3](docs/openapi.json) into an API client, or use the [Postman collection](docs/postman/RolloutDesk.postman_collection.json) with its [blank-secret environment](docs/postman/RolloutDesk.local.postman_environment.example.json). The [Indonesian walkthrough](docs/REST-CLIENT-GUIDE.md) explains each request, cookie/CSRF authentication, scoped bearer tokens and version conflicts.
+
+With the latest web image running, the same files are available at `/openapi.json`, `/postman.collection.json` and `/postman.environment.example.json` on the local base URL. They are static JSON downloads. The Postman walkthrough saves two drafts, publishes both, rolls back while keeping the second draft, checks token scope and logs out. A complete run adds three publications to synthetic staging data.
+
 ## Screens
 
 | Operator login | Draft, active revision and history |
@@ -101,6 +107,7 @@ Local browser checks use the installed Microsoft Edge; CI uses Chromium. Browser
 - [Interview explanation and demo, in Indonesian](docs/INTERVIEW.md)
 - [Architecture and transaction boundaries](docs/ARCHITECTURE.md)
 - [HTTP API, request examples and decision reasons](docs/API.md)
+- [REST API and Postman tutorial, in Indonesian](docs/REST-CLIENT-GUIDE.md)
 - [Operations, tests and troubleshooting](docs/OPERATIONS.md)
 
 ## Boundaries

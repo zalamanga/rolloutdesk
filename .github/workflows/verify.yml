@@ -33,6 +33,8 @@ jobs:
         run: node scripts/init-env.mjs
       - run: npm ci --ignore-scripts
         working-directory: frontend
+      - name: Validate generated OpenAPI and Postman contract
+        run: node scripts/check-api-docs.mjs
       - run: npm test
         working-directory: frontend
       - run: npm run build
@@ -53,6 +55,8 @@ jobs:
         run: docker compose -f compose.yml -p rolloutdesk build web
       - name: Start actual application services
         run: docker compose -f compose.yml -p rolloutdesk up -d --no-build --wait --wait-timeout 180
+      - name: Fetch actual public OpenAPI and Postman JSON
+        run: node scripts/check-served-docs.mjs
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Browser workflows and narrow layout
