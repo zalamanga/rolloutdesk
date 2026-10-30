@@ -1,0 +1,61 @@
+name: rolloutdesk
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: rolloutdesk
+      POSTGRES_USER: rolloutdesk
+      POSTGRES_PASSWORD: ${ROLLOUT_DB_PASSWORD:?Run scripts/Init.ps1}
+    ports: ["127.0.0.1:5450:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=40"]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rolloutdesk -d rolloutdesk"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  api:
+    image: rolloutdesk-api:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    environment:
+      ROLLOUT_DB_URL: postgres://rolloutdesk:${ROLLOUT_DB_PASSWORD}@db:5432/rolloutdesk?sslmode=disable
+      ROLLOUT_DEMO_PASSWORD: ${ROLLOUT_DEMO_PASSWORD:?Run scripts/Init.ps1}
+      ROLLOUT_APP_ORIGIN: ${ROLLOUT_APP_ORIGIN:-http://127.0.0.1:8098}
+      ROLLOUT_COOKIE_SECURE: "false"
+      ROLLOUT_STAGING_TOKEN_SHA256: ${ROLLOUT_STAGING_TOKEN_SHA256:?Run scripts/Init.ps1}
+      ROLLOUT_PRODUCTION_TOKEN_SHA256: ${ROLLOUT_PRODUCTION_TOKEN_SHA256:?Run scripts/Init.ps1}
+    depends_on:
+      db: {condition: service_healthy}
+    mem_limit: 192m
+    read_only: true
+    tmpfs: ["/tmp:size=8m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "/app/api", "health"]
+      interval: 3s
+      timeout: 10s
+      retries: 30
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports: ["127.0.0.1:8098:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    mem_limit: 64m
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+volumes:
+  pgdata:

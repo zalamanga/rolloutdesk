@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: rolloutdesk_test
+      POSTGRES_USER: rolloutdesk_test
+      POSTGRES_PASSWORD: ${ROLLOUT_TEST_DB_PASSWORD:?Run scripts/Init.ps1}
+    ports: ["127.0.0.1:5451:5432"]
+    tmpfs: ["/var/lib/postgresql/data:size=128m"]
+    command: ["postgres", "-c", "shared_buffers=16MB", "-c", "max_connections=40"]
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rolloutdesk_test -d rolloutdesk_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  tests:
+    image: rolloutdesk-tests:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: test
+    environment:
+      ROLLOUT_TEST_DB_URL: postgres://rolloutdesk_test:${ROLLOUT_TEST_DB_PASSWORD}@db:5432/rolloutdesk_test?sslmode=disable
+      REQUIRE_DB_TESTS: "1"
+    depends_on:
+      db: {condition: service_healthy}
+    mem_limit: 384m
+    command: ["/app/labtests", "--nocapture", "--test-threads=1"]

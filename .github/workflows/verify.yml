@@ -1,0 +1,93 @@
+name: Verify RolloutDesk
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: rolloutdesk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ROLLOUT_DB_PASSWORD: "1111111111111111111111111111111111111111111111111111111111111111"
+      ROLLOUT_DEMO_PASSWORD: "2222222222222222222222222222222222222222222222222222222222222222"
+      ROLLOUT_STAGING_TOKEN: "3333333333333333333333333333333333333333333333333333333333333333"
+      ROLLOUT_PRODUCTION_TOKEN: "4444444444444444444444444444444444444444444444444444444444444444"
+      ROLLOUT_TEST_DB_PASSWORD: "5555555555555555555555555555555555555555555555555555555555555555"
+      ROLLOUT_APP_ORIGIN: http://127.0.0.1:8098
+      ROLLOUT_BASE_URL: http://127.0.0.1:8098
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Generate isolated synthetic CI configuration
+        run: node scripts/init-env.mjs
+      - run: npm ci --ignore-scripts
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npm audit --audit-level=high
+        working-directory: frontend
+      - name: Compile Rust API and test harness once
+        run: docker compose -f compose.test.yml -p rolloutdesk-test build tests
+      - name: Start isolated actual PostgreSQL
+        run: docker compose -f compose.test.yml -p rolloutdesk-test up -d --wait --wait-timeout 90 db
+      - name: Rust unit and actual PostgreSQL integration tests
+        run: docker compose -f compose.test.yml -p rolloutdesk-test run --rm --no-deps tests
+      - name: Stop isolated test PostgreSQL
+        run: docker compose -f compose.test.yml -p rolloutdesk-test down
+      - name: Reuse compiled Rust API image
+        run: docker compose -f compose.yml -p rolloutdesk build api
+      - name: Build static React and Nginx
+        run: docker compose -f compose.yml -p rolloutdesk build web
+      - name: Start actual application services
+        run: docker compose -f compose.yml -p rolloutdesk up -d --no-build --wait --wait-timeout 180
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Browser workflows and narrow layout
+        run: npm run test:e2e
+        working-directory: frontend
+      - name: Real bearer-token scope and independent bucket vectors
+        run: node scripts/client-probe.mjs
+      - name: Real screenshots, responsive layouts and text contrast
+        run: node scripts/capture-ui.mjs
+      - name: Export compiled Linux binaries for local verification
+        run: |
+          mkdir -p .local/compiled
+          cid=$(docker create rolloutdesk-tests:local)
+          docker cp "$cid:/app/labtests" .local/compiled/labtests
+          docker rm "$cid"
+          cid=$(docker create rolloutdesk-api:local)
+          docker cp "$cid:/app/api" .local/compiled/api
+          docker rm "$cid"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: rolloutdesk-verification
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: true
+          path: |
+            docs/screenshots/*.png
+            .local/compiled/api
+            .local/compiled/labtests
+            .local/ui-checks.json
+            .local/client-probe.json
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -p rolloutdesk logs --no-color --tail 50
+      - name: Stop owned CI services
+        if: always()
+        run: |
+          docker compose -f compose.yml -p rolloutdesk down
+          docker compose -f compose.test.yml -p rolloutdesk-test down

@@ -1,0 +1,34 @@
+{
+  "algorithm": "sha256-u32be-mod10000-v1",
+  "provenance": "Computed independently with Python hashlib and explicit big-endian byte encoding, 2026-10-30. These are synthetic inputs.",
+  "vectors": [
+    {
+      "flagKey": "checkout-redesign",
+      "environment": "staging",
+      "subjectId": "demo-customer-001",
+      "sha256": "0b729ba78f25ace4c9820f20d2367330044c8f7f435b2ba8be91842316953bb2",
+      "bucket": 327
+    },
+    {
+      "flagKey": "checkout-redesign",
+      "environment": "production",
+      "subjectId": "demo-customer-001",
+      "sha256": "4484f383eff0ae20f545ad14002ef1959ee772317ab38e6ac4e9b0c2e5fd0a94",
+      "bucket": 3779
+    },
+    {
+      "flagKey": "bulk-export",
+      "environment": "staging",
+      "subjectId": "demo-customer-001",
+      "sha256": "946393997c59f544683277e7de620b4a24a3832f46d429aeab6809fcaf487da5",
+      "bucket": 3817
+    },
+    {
+      "flagKey": "priority-support",
+      "environment": "production",
+      "subjectId": "DEMO_42",
+      "sha256": "ad3e112ad59e5b3e722d06d6328968cb67a0c4da0b8a2c97c353fa1c4c0ba454",
+      "bucket": 5994
+    }
+  ]
+}

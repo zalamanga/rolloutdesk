@@ -1,0 +1,42 @@
+[package]
+name = "rolloutdesk"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
+bcrypt = "=0.19.3"
+chrono = { version = "=0.4.45", default-features = false, features = ["clock", "serde"] }
+deadpool-postgres = "=0.14.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha2 = "=0.10.9"
+subtle = "=2.6.1"
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
+tokio-postgres = { version = "=0.7.18", features = ["with-chrono-0_4", "with-serde_json-1", "with-uuid-1"] }
+uuid = { version = "=1.29.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tower = { version = "=0.5.3", features = ["util"] }
+
+[profile.release]
+opt-level = 1
+debug = 0
+lto = false
+codegen-units = 16
+strip = "debuginfo"
+
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
