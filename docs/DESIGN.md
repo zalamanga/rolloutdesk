@@ -11,4 +11,4 @@ Reading this as: a release-control workspace for a developer comparing a draft w
 - Navigation follows the work: Flags, Playground and Audit. Keep environment selectors visible and label any draft-only result so it cannot be mistaken for production behavior.
 - Work sheets have modest corners and borders; buttons have clear boundaries and 44 px minimum targets. Teal marks the main operation rather than every panel.
 - Stack comparisons on narrow screens, preserve form state across refresh, and use local scroll regions for wide evidence tables. Motion is only hover, focus and pressed feedback.
-- Real counts and history come from PostgreSQL. Do not invent exposure statistics, rollout success rates or customer impact. Subject IDs are synthetic input and are not stored or logged.
+- Real counts and history come from PostgreSQL. Do not invent exposure statistics, rollout success rates or customer impact. Preview and client-evaluation subject inputs are synthetic and are not stored or logged; allowlist IDs remain part of stored draft and publication configurations.
