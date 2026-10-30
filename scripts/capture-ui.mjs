@@ -355,7 +355,12 @@ try {
   await page
     .getByRole("link", { name: "RolloutDesk flags", exact: true })
     .click();
-  await page.locator('a[href="#/flags/checkout-redesign/staging"]').click();
+  await expect(
+    page.getByRole("heading", { name: "Feature flags", exact: true }),
+  ).toBeVisible();
+  await page
+    .locator('.registry a[href="#/flags/checkout-redesign/staging"]')
+    .click();
   await page.getByRole("link", { name: "Production", exact: true }).click();
   await expect(page.locator(".environment-label")).toHaveText("production");
   await page.getByRole("link", { name: "Staging", exact: true }).click();
